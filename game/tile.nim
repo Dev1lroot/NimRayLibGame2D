@@ -16,7 +16,7 @@ proc createTile*(x, y: int32): Tile =
             y: y
         ), 
         w: 32,
-        h: 48
+        h: 32
     )
     return tile
 proc render*(tile: Tile, textures: seq[TextureRef]) =

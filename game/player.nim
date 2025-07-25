@@ -12,6 +12,8 @@ type
 
 proc createPlayer*(): Player =
     var player = Player()
+    player.w = 32
+    player.h = 32
     player.direction = "down"
     player.speed = 4;
     return player
@@ -28,11 +30,6 @@ proc moveLeft*(player: var Player) =
 proc moveRight*(player: var Player) =
     player.position.x += player.speed
     player.direction = "right"
-
-#proc render*(player: var Player, textures: var Table[string, Texture2D]) =
-
-    #var x = 0
-    #drawTexture(textures["player_" & dir], player.position.x, player.position.y, White)
 
 proc isCollidesWith*(player: Player, tile: Tile): bool =
     let
@@ -52,7 +49,6 @@ proc isCollidesWith*(player: Player, tile: Tile): bool =
         return true
 
 proc directionBlocked*(player: Player, dir: string, tiles: seq[Tile]): bool =
-    # Создаем временный объект игрока для проверки движения
     var testPlayer = player
 
     case dir
