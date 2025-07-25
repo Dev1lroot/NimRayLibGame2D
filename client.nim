@@ -6,17 +6,16 @@ import game/player as aaaaaaaaaa, game/textures as bbbbbbbbb, game/tile as ccccc
 # global vars >:3
 var address = "127.0.0.1"
 var port = 3000
-var sendQueue: seq[string]
-var toRenderCycle: seq[string]
-var toRenderCycleLock: Lock
-var queueLock: Lock
-var posLock: Lock
-var renderThread: Thread[void]
-const MaxMessages = 1024
 
-var messageBuffer: array[MaxMessages, array[256, char]]
-var messageCount: int
-var bufferLock: Lock
+var renderThread: Thread[void]
+
+var toRenderer: Channel[string]
+var toNetwork: Channel[string]
+var toRendererLock: Lock
+var toNetworkLock: Lock
+
+proc sendJson(chan: var Channel[string], json: JsonNode) =
+    chan.send($json)
 
 # To do ! All params must be transfered from Launcher
 for param in commandLineParams():
@@ -29,7 +28,7 @@ for param in commandLineParams():
             address = param.split(":")[1]
             echo "Setting address to: " & address
 
-# Frontend<->Backend
+# Frontend <--> Backend
 proc gameNetworkingCycle() {.async.} =
     proc run() {.async.} =
         try:
@@ -37,25 +36,20 @@ proc gameNetworkingCycle() {.async.} =
             echo "✅ Connected"
 
             while true:
-                # CLIENT INPUT
-                block readSendQueue:
-                    withLock queueLock:
-                        if sendQueue.len > 0:
-                            let msg = sendQueue[0]
-                            sendQueue.delete(0)
-                            await ws.send(msg)
+                # CLIENT -> SERVER
+                withLock(toNetworkLock):
+                    let (hasMsg, receivedMsg) = toNetwork.tryRecv()
+                    if hasMsg:
+                        echo "[Networking] Sending message to server: ", receivedMsg
+                        await ws.send(receivedMsg)
 
-                # SERVER INPUT
+                # SERVER -> CLIENT
                 if ws.readyState == Open:
                     let msg = await ws.receiveStrPacket()
-                    withLock bufferLock:
-                        if msg.len > 0 and messageCount < MaxMessages:
-                            copyMem(addr messageBuffer[messageCount][0], addr msg[0], min(msg.len, 255))
-                            messageBuffer[messageCount][min(msg.len, 255)] = '\0' # null-terminated
-                            inc messageCount
-                    echo $msg
+                    withLock(toRendererLock):
+                        toRenderer.send($msg)
 
-                await sleepAsync(10)
+                await sleepAsync(1)
         except CatchableError as e:
             echo "❌ WebSocket error: ", e.msg
 
@@ -73,7 +67,6 @@ proc gameRenderCycle {.thread, gcsafe.} =
         rotation: 0.0,
         zoom: 1.0
     )
-    var localMessages: seq[string] = @[]
 
     # Init window
     initWindow(screen.w, screen.h, "Game 2D")
@@ -93,17 +86,25 @@ proc gameRenderCycle {.thread, gcsafe.} =
     while not windowShouldClose():
 
         # Network IO
-        var localMessages: seq[string] = @[]
-
-        withLock bufferLock:
-            for i in 0..<messageCount:
-                localMessages.add($cast[cstring](addr messageBuffer[i]))
-            messageCount = 0
-
-        # Checking collisions
-        # for tile in tiles:
-            # if tile.isCollidesWith(player):
-                #ss
+        var msgReceived: bool
+        var msg: string
+        withLock(toRendererLock):
+            let (hasMsg, receivedMsg) = toRenderer.tryRecv()
+            msgReceived = hasMsg
+            if hasMsg:
+                msg = receivedMsg
+                echo "[Renderer] Received message: " & msg
+                try:
+                    let data = parseJson(msg)
+                    if data.hasKey("packet"):
+                        echo "is packet"
+                        if data["packet"].getStr() == "tiles":
+                            echo "reloading tiles"
+                            tiles = @[]
+                            for tile in data["tiles"]:
+                                tiles.add(createTile(int32(tile["x"].getInt()),int32(tile["y"].getInt())))
+                except:
+                    echo "damaged packet"
 
         # player navigation
         if isKeyDown(W) and not player.directionBlocked("up", tiles):
@@ -114,6 +115,7 @@ proc gameRenderCycle {.thread, gcsafe.} =
             player.moveLeft()
         if isKeyDown(D) and not player.directionBlocked("right", tiles):
             player.moveRight()
+            toNetwork.sendJson(%*{ "packet": "player_move", "x": player.position.x, "y": player.position.y })
 
         # reorders world objects to appear properly (only needed after world update event)
         tiles.sort(proc(a, b: Tile): int {.closure.} =
@@ -148,15 +150,18 @@ proc gameRenderCycle {.thread, gcsafe.} =
     closeWindow()
 
 proc main =
-  initLock(queueLock)
-  initLock(posLock)
+    initLock(toRendererLock)
+    initLock(toNetworkLock)
 
-  # Стартуем render в потоке
-  createThread(renderThread, gameRenderCycle)
+    toRenderer.open()
+    toNetwork.open()
 
-  # Стартуем networking отдельно
-  asyncCheck gameNetworkingCycle()
+    # Renderer Thread
+    createThread(renderThread, gameRenderCycle)
 
-  # Ждём завершения render-потока
-  joinThread(renderThread)
+    # Networking Thread
+    asyncCheck gameNetworkingCycle()
+
+    # F
+    joinThread(renderThread)
 main()

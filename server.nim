@@ -1,4 +1,3 @@
-# Notice: I start to hate this language, the libs and community, its abandonware
 import ws, asyncdispatch, strformat, times, os, strutils
 
 var port = 3000

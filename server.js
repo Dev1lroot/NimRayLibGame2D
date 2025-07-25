@@ -4,6 +4,17 @@ const wss = new WebSocket.Server({ port: 3000 });
 
 const clients = new Map();
 let clientIdCounter = 0;
+var tiles = [];
+
+// Generating Tiles
+for(let i = 0; i < 100; i ++)
+{
+    tiles.push({
+        name: "tile", 
+        x: Math.floor(32*(Math.random()*100)),
+        y: Math.floor(32*(Math.random()*100)),
+    })
+}
 
 console.log('WebSocket server started on port 3000');
 
@@ -12,7 +23,7 @@ wss.on('connection', function connection(ws)
     const clientId = clientIdCounter++;
     clients.set(clientId, ws);
     console.log(`New client connected. ID: ${clientId}. Total clients: ${clients.size}`);
-    ws.send(`Welcome, client ${clientId}!`);
+    ws.send(JSON.stringify({ packet: "tiles", tiles: tiles}));
 
     broadcast(`Client ${clientId} has joined the chat.`, clientId);
 
