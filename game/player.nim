@@ -9,6 +9,8 @@ type
         speed*: int32
         w*: int32
         h*: int32
+        offsetX*: int32
+        offsetY*: int32
 
 proc createPlayer*(): Player =
     var player = Player()

@@ -7,6 +7,8 @@ type
         position*: Position2D
         w*: int32
         h*: int32
+        offsetX*: int32
+        offsetY*: int32
 
 proc createTile*(x, y: int32): Tile =
     var tile = Tile(
@@ -21,3 +23,4 @@ proc createTile*(x, y: int32): Tile =
     return tile
 proc render*(tile: Tile, textures: seq[TextureRef]) =
     textures.drawTextureByName(tile.name, tile.position.x, tile.position.y, White)
+    drawRectangle(tile.position.x, tile.position.y, tile.w, tile.h, RED)
