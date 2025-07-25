@@ -1,2 +1,2 @@
-nim c --verbosity:3 -r test.nim
+nim c --verbosity:3 -r game.nim
 pause

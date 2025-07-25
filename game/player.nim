@@ -1,8 +1,6 @@
-import raylib, rlgl, raymath, rmem, reasings, rcamera, tables
+import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, position2d
 
 type
-    Position2D* = object
-        x*, y*: int32 = 0
     Player* = object
         position*: Position2D
         direction*: string
