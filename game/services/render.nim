@@ -1,5 +1,5 @@
 import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, os, random, sequtils, std/algorithm, websocket, asyncdispatch, locks, strutils, threadpool, json, parseutils, ws
-import ../entities/player, ../libs/textures, ../entities/tile, ../libs/position2d, ../libs/screen, network, ../libs/channelutils, ../libs/threadsio
+import ../entities/player, ../libs/textures, ../entities/tile, ../libs/position2d, ../libs/screen, network, ../libs/channelutils, ../libs/threadsio, ../entities/drawable
 
 proc processGameData(package: JsonNode, players: var seq[Player], tiles: var seq[Tile]) =
     if package.hasKey("packet"):
@@ -76,16 +76,8 @@ proc gameRenderService*(io: ThreadsIO) {.thread, gcsafe.} =
             withLock(io.toNetworkLock):
                 io.toNetwork.sendJson(player.transfer())
 
-        # reorders world objects to appear properly (only needed after world update event)
-        tiles.sort(proc(a, b: Tile): int {.closure.} =
-            if a.position.y < b.position.y: -1
-            elif a.position.y > b.position.y: 1
-            else: 0
-        )
-
         # Changing camera position
-        camera.target.x = float32(player.position.x)
-        camera.target.y = float32(player.position.y)
+        camera.followPlayer(player)
 
         # Init Drawing
         beginDrawing()
@@ -93,16 +85,35 @@ proc gameRenderService*(io: ThreadsIO) {.thread, gcsafe.} =
         clearBackground(RayWhite)
 
         # render tiles behind the player
-        for tile in tiles:
-            if player.position.y >= tile.position.y:
-                textures.drawTextureByName(tile.name, tile.position.x, tile.position.y, White)
+        # for tile in tiles:
+        #     if player.position.y >= tile.position.y:
+        #         textures.drawTextureByName(tile.name, tile.position.x, tile.position.y, White)
 
+        # for p in players:
+        #     if p.uuid != player.uuid:
+        #         p.render(textures)
+
+        var renderQueue: seq[Drawable] = @[]
+        renderQueue.add player
         for p in players:
             if p.uuid != player.uuid:
-                p.render(textures)
+                renderQueue.add p
+        for t in tiles: renderQueue.add t
+
+        # reorders world objects to appear properly (only needed after world update event)
+        renderQueue.sort(proc(a, b: Drawable): int {.closure.} =
+            if a.position.y < b.position.y: -1
+            elif a.position.y > b.position.y: 1
+            else: 0
+        )
+
+        for drawable in renderQueue:
+            drawable.render(textures)
+
+        drawText("Player: " & $player.position , player.position.x, player.position.y - 20, 10, BLACK)
 
         # render the player itself (our player is always on top of others) to fix 
-        player.render(textures)
+        # player.render(textures)
 
         # render tiles in front of the player
         for tile in tiles:

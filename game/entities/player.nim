@@ -1,18 +1,15 @@
 
-import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, ../libs/position2d, tile, ../libs/textures, json, ../libs/uuid
+import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, ../libs/position2d, tile, ../libs/textures, json, ../libs/uuid, drawable
 
 type
     PlayerControls* = object
         key*: raylib.KeyboardKey
         action*: string
 
-    Player* = object
-        position*: Position2D
+    Player* = ref object of Drawable
         direction*: string
         sprite*: string
         speed*: int32
-        w*: int32
-        h*: int32
         offsetX*: int32
         offsetY*: int32
         uuid*: string
@@ -79,8 +76,8 @@ proc handleControls*(player: var Player, tiles: seq[Tile]): bool =
                     player.move(player.direction)
     return controlsUsed
 
-proc render*(player: Player, textures: seq[TextureRef]) =
-    textures.drawTextureByName("player_" & player.direction, player.position.x, player.position.y, White)
+method render*(self: Player, textures: seq[TextureRef]) =
+    textures.drawTextureByName("player_" & self.direction, self.position.x, self.position.y, White)
 
 proc transfer*(player: Player): JsonNode =
     # echo "[Player] Preparing data to transfer"
@@ -95,3 +92,7 @@ proc transfer*(player: Player): JsonNode =
             "direction": player.direction
         }
     }
+
+method followPlayer*(camera: var Camera2D, player: Player) =
+    camera.target.x = float32(player.position.x)
+    camera.target.y = float32(player.position.y)
