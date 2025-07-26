@@ -13,7 +13,8 @@ proc gameNetworkService*(io: ThreadsIO, address: string, port: int) {.async.} =
                     withLock(io.toNetworkLock):
                         # echo "[NetworkService] Waiting for package"
                         let (hasMsg, receivedMsg) = io.toNetwork.tryRecv()
-                        await ws.send(receivedMsg)
+                        if hasMsg:
+                            await ws.send(receivedMsg)
                     await sleepAsync(1)
 
             proc reader() {.async.} =

@@ -55,7 +55,7 @@ wss.on('connection', function connection(ws)
             }
         }
         catch(e){
-            console.log("Receiving bad packet");
+            console.log("Receiving bad packet: " + receivedMessage);
         }
     });
 

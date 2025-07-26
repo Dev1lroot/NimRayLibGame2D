@@ -4,6 +4,8 @@ type
     TextureRef* = object
         name*: string
         texture*: Texture2D
+    Renderer* = object
+        textures*: seq[TextureRef]
 
 proc addTexture*(textures: var seq[TextureRef], name: string, path: string) =
     textures.add(TextureRef(name: name, texture: loadTexture(path)))

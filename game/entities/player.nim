@@ -1,5 +1,5 @@
 
-import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, ../libs/position2d, tile, ../libs/textures, json, ../libs/uuid, drawable
+import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, ../libs/position2d, tile, ../libs/textures, json, ../libs/uuid, drawable, ../libs/collision, ../libs/rectangle2points
 
 type
     PlayerControls* = object
@@ -7,24 +7,28 @@ type
         action*: string
 
     Player* = ref object of Drawable
-        direction*: string
+        direction*: string = "down"
         sprite*: string
-        speed*: int32
+        speed*: int32 = 4
         offsetX*: int32
         offsetY*: int32
         uuid*: string
         controls*: seq[PlayerControls]
+        renderCollisionMask*:bool = false
+        renderPosition*:bool = false
 
 proc createPlayer*(): Player =
     var player = Player()
-    player.w = 32
-    player.h = 32
-    player.direction = "up"
-    player.speed = 4;
     player.uuid = uuid.generateV4()
     return player
 
-proc move*(player: var Player, direction: string) =
+method clone*(self: Player): Player =
+    var player = createPlayer()
+    player.position.x = self.position.x
+    player.position.y = self.position.y
+    return player
+
+method move*(player: var Player, direction: string) =
     if direction == "up":
         player.position.y -= player.speed
     if direction == "down":
@@ -34,38 +38,29 @@ proc move*(player: var Player, direction: string) =
     if direction == "right":
         player.position.x += player.speed
 
-proc isCollidesWith*(player: Player, tile: Tile): bool =
-    let
-        leftA = tile.position.x
-        rightA = tile.position.x + tile.w
-        topA = tile.position.y
-        bottomA = tile.position.y + tile.h
+method getBounds*(self: Player): Bounds =
+    return Bounds(
+        x1: self.position.x + self.offsetX + 8,
+        y1: self.position.y + 48,
+        x2: self.position.x + self.offsetX + self.w - 8,
+        y2: self.position.y + 48 + 2
+    )
 
-        leftB = player.position.x
-        rightB = player.position.x + player.w
-        topB = player.position.y
-        bottomB = player.position.y + player.h
+method directionBlocked*(player: Player, direction: string, tiles: seq[Tile]): bool =
+    var testPlayer = player.clone()
 
-    if rightA <= leftB or rightB <= leftA or bottomA <= topB or bottomB <= topA:
-        return false
-    else:
-        return true
-
-proc directionBlocked*(player: Player, dir: string, tiles: seq[Tile]): bool =
-    var testPlayer = player
-
-    testPlayer.move(dir)
+    testPlayer.move(direction)
 
     for tile in tiles:
-        if testPlayer.isCollidesWith(tile):
+        if testPlayer.getBounds().intersects(tile.getBounds()):
             return true
 
     return false
 
-proc bindControls*(player: var Player, newcontrols: seq[PlayerControls]) =
+method bindControls*(player: var Player, newcontrols: seq[PlayerControls]) =
     player.controls = newcontrols
 
-proc handleControls*(player: var Player, tiles: seq[Tile]): bool =
+method handleControls*(player: var Player, tiles: seq[Tile]): bool =
     var controlsUsed = false
     for control in player.controls:
         if raylib.isKeyDown(control.key):
@@ -74,12 +69,23 @@ proc handleControls*(player: var Player, tiles: seq[Tile]): bool =
                 player.direction = control.action
                 if not player.directionBlocked(player.direction, tiles):
                     player.move(player.direction)
+            if control.action in ["debug"]:
+                player.renderCollisionMask = not player.renderCollisionMask
+                player.renderPosition = not player.renderPosition
+
     return controlsUsed
 
 method render*(self: Player, textures: seq[TextureRef]) =
     textures.drawTextureByName("player_" & self.direction, self.position.x, self.position.y, White)
 
-proc transfer*(player: Player): JsonNode =
+    if self.renderPosition:
+        drawText("Player: " & $self.position , self.position.x, self.position.y - 20, 10, BLACK)
+
+    if self.renderCollisionMask:
+        let b = self.getBounds()
+        drawRectangleByPoints(b.x1, b.y1, b.x2, b.y2, RED)
+
+method transfer*(player: Player): JsonNode =
     # echo "[Player] Preparing data to transfer"
     return %*{
         "packet": "player_move",
