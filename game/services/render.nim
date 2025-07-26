@@ -28,6 +28,14 @@ proc gameRenderService*(io: ThreadsIO) {.thread, gcsafe.} =
     var screen = Screen(w: 800, h: 600)
     var textures: seq[TextureRef] # crutch
     var player = createPlayer()
+    
+    player.bindControls(@[
+        PlayerControls(key: W, action: "up"),
+        PlayerControls(key: A, action: "left"),
+        PlayerControls(key: S, action: "down"),
+        PlayerControls(key: D, action: "right"),
+    ]);
+
     var tiles: seq[Tile]
     var players: seq[Player]
     var camera = Camera2D(
@@ -64,20 +72,7 @@ proc gameRenderService*(io: ThreadsIO) {.thread, gcsafe.} =
                     discard
 
         # player navigation
-        if isKeyDown(W):
-            player.moveUp(tiles)
-            withLock(io.toNetworkLock):
-                io.toNetwork.sendJson(player.transfer())
-        if isKeyDown(S):
-            player.moveDown(tiles)
-            withLock(io.toNetworkLock):
-                io.toNetwork.sendJson(player.transfer())
-        if isKeyDown(A):
-            player.moveLeft(tiles)
-            withLock(io.toNetworkLock):
-                io.toNetwork.sendJson(player.transfer())
-        if isKeyDown(D):
-            player.moveRight(tiles)
+        if player.handleControls(tiles):
             withLock(io.toNetworkLock):
                 io.toNetwork.sendJson(player.transfer())
 
@@ -103,7 +98,8 @@ proc gameRenderService*(io: ThreadsIO) {.thread, gcsafe.} =
                 textures.drawTextureByName(tile.name, tile.position.x, tile.position.y, White)
 
         for p in players:
-            p.render(textures)
+            if p.uuid != player.uuid:
+                p.render(textures)
 
         # render the player itself (our player is always on top of others) to fix 
         player.render(textures)

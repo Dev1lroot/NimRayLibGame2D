@@ -2,24 +2,40 @@
 import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, ../libs/position2d, tile, ../libs/textures, json, ../libs/uuid
 
 type
+    PlayerControls* = object
+        key*: raylib.KeyboardKey
+        action*: string
+
     Player* = object
         position*: Position2D
         direction*: string
+        sprite*: string
         speed*: int32
         w*: int32
         h*: int32
         offsetX*: int32
         offsetY*: int32
         uuid*: string
+        controls*: seq[PlayerControls]
 
 proc createPlayer*(): Player =
     var player = Player()
     player.w = 32
     player.h = 32
-    player.direction = "down"
+    player.direction = "up"
     player.speed = 4;
     player.uuid = uuid.generateV4()
     return player
+
+proc move*(player: var Player, direction: string) =
+    if direction == "up":
+        player.position.y -= player.speed
+    if direction == "down":
+        player.position.y += player.speed
+    if direction == "left":
+        player.position.x -= player.speed
+    if direction == "right":
+        player.position.x += player.speed
 
 proc isCollidesWith*(player: Player, tile: Tile): bool =
     let
@@ -41,17 +57,7 @@ proc isCollidesWith*(player: Player, tile: Tile): bool =
 proc directionBlocked*(player: Player, dir: string, tiles: seq[Tile]): bool =
     var testPlayer = player
 
-    case dir
-    of "up":
-        testPlayer.position.y -= testPlayer.speed
-    of "down":
-        testPlayer.position.y += testPlayer.speed
-    of "left":
-        testPlayer.position.x -= testPlayer.speed
-    of "right":
-        testPlayer.position.x += testPlayer.speed
-    else:
-        return false
+    testPlayer.move(dir)
 
     for tile in tiles:
         if testPlayer.isCollidesWith(tile):
@@ -59,25 +65,19 @@ proc directionBlocked*(player: Player, dir: string, tiles: seq[Tile]): bool =
 
     return false
 
-proc moveUp*(player: var Player, tiles: seq[Tile]) =
-    player.direction = "up"
-    if not player.directionBlocked(player.direction, tiles):
-        player.position.y -= player.speed
-        
-proc moveDown*(player: var Player, tiles: seq[Tile]) =
-    player.direction = "down"
-    if not player.directionBlocked(player.direction, tiles):
-        player.position.y += player.speed
+proc bindControls*(player: var Player, newcontrols: seq[PlayerControls]) =
+    player.controls = newcontrols
 
-proc moveLeft*(player: var Player, tiles: seq[Tile]) =
-    player.direction = "left"
-    if not player.directionBlocked(player.direction, tiles):
-        player.position.x -= player.speed
-
-proc moveRight*(player: var Player, tiles: seq[Tile]) =
-    player.direction = "right"
-    if not player.directionBlocked(player.direction, tiles):
-        player.position.x += player.speed
+proc handleControls*(player: var Player, tiles: seq[Tile]): bool =
+    var controlsUsed = false
+    for control in player.controls:
+        if raylib.isKeyDown(control.key):
+            if control.action in ["up","down","left","right"]:
+                controlsUsed = true
+                player.direction = control.action
+                if not player.directionBlocked(player.direction, tiles):
+                    player.move(player.direction)
+    return controlsUsed
 
 proc render*(player: Player, textures: seq[TextureRef]) =
     textures.drawTextureByName("player_" & player.direction, player.position.x, player.position.y, White)
