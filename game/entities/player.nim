@@ -1,5 +1,5 @@
 
-import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, ../libs/position2d, tile, ../libs/textures, json, ../libs/uuid, drawable, ../libs/collision, ../libs/rectangle2points
+import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, ../libs/position3d, tile, ../libs/textures, json, ../libs/uuid, drawable, ../libs/collision, ../libs/rectangle2points
 
 type
     PlayerControls* = object
@@ -20,6 +20,7 @@ type
 proc createPlayer*(): Player =
     var player = Player()
     player.uuid = uuid.generateV4()
+    player.position.z = 48
     return player
 
 method clone*(self: Player): Player =
@@ -52,7 +53,7 @@ method directionBlocked*(player: Player, direction: string, tiles: seq[Tile]): b
     testPlayer.move(direction)
 
     for tile in tiles:
-        if testPlayer.getBounds().intersects(tile.getBounds()):
+        if tile.hasCollision and testPlayer.getBounds().intersects(tile.getBounds()):
             return true
 
     return false

@@ -1,8 +1,8 @@
-import ../libs/position2d, ../libs/textures
+import ../libs/position3d, ../libs/textures
 
 type
     Drawable* = ref object of RootObj
-        position*: Position2D
+        position*: Position3D
         w*: int32 = 32
         h*: int32 = 32
 

@@ -1,5 +1,5 @@
 import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, os, random, sequtils, std/algorithm, websocket, asyncdispatch, locks, strutils, threadpool, json, parseutils, ws
-import ../entities/player, ../libs/textures, ../entities/tile, ../libs/position2d, ../libs/screen, network, ../libs/channelutils, ../libs/threadsio, ../entities/drawable
+import ../entities/player, ../libs/textures, ../entities/tile, ../libs/position3d, ../libs/screen, network, ../libs/channelutils, ../libs/threadsio, ../entities/drawable
 
 proc processGameData(package: JsonNode, players: var seq[Player], tiles: var seq[Tile]): bool =
     var reorderRequired = false
@@ -12,7 +12,11 @@ proc processGameData(package: JsonNode, players: var seq[Player], tiles: var seq
             tiles = @[]
             reorderRequired = true
             for tile in package["tiles"]:
-                tiles.add(createTile(int32(tile["x"].getInt()),int32(tile["y"].getInt())))
+                tiles.add(createTile(
+                    tile["name"].getStr(), 
+                    int32(tile["x"].getInt()),
+                    int32(tile["y"].getInt())
+                ))
 
         # import players
         if package.hasKey("players"):
@@ -24,6 +28,7 @@ proc processGameData(package: JsonNode, players: var seq[Player], tiles: var seq
                 p.uuid       = player["uuid"].getStr()
                 p.position.x = int32(player["position"]["x"].getInt())
                 p.position.y = int32(player["position"]["y"].getInt())
+                p.position.z = 48
                 p.direction  = player["direction"].getStr()
                 players.add(p)
     return reorderRequired
@@ -58,7 +63,8 @@ proc gameRenderService*(io: ThreadsIO) {.thread, gcsafe.} =
     setTargetFPS(60)
 
     # Texture loading
-    textures.addTexture("tile", "assets/textures/tile.png")
+    for t in ["sand","forest","water","grass","tile","rock","snow"]:
+        textures.addTexture("water", "assets/textures/" & t & ".png")
     for anim in ["left", "right", "up", "down"]:
         textures.addTexture("player_" & anim, "assets/textures/player_" & anim & ".png")
 
@@ -105,13 +111,16 @@ proc gameRenderService*(io: ThreadsIO) {.thread, gcsafe.} =
         for p in players:
             if p.uuid != player.uuid:
                 renderQueue.add p
-        for t in tiles: renderQueue.add t
+        for t in tiles:
+            if abs(player.position.x - t.position.x) < screen.w:
+                if abs(player.position.y - t.position.y) < screen.h:
+                    renderQueue.add t
 
         # reorders world objects to appear properly (only needed after world update event)
         if reorderRequired:
             renderQueue.sort(proc(a, b: Drawable): int {.closure.} =
-                if a.position.y < b.position.y: -1
-                elif a.position.y > b.position.y: 1
+                if a.position.y + a.position.z < b.position.y + b.position.z: -1
+                elif a.position.y + a.position.z > b.position.y + b.position.z: 1
                 else: 0
             )
 
@@ -120,9 +129,9 @@ proc gameRenderService*(io: ThreadsIO) {.thread, gcsafe.} =
             drawable.render(textures)
 
         # render tiles in front of the player
-        for tile in tiles:
-            if player.position.y < tile.position.y:
-                tile.render(textures)
+        # for tile in tiles:
+        #     if player.position.y < tile.position.y:
+        #         tile.render(textures)
 
         endDrawing()
     closeWindow()

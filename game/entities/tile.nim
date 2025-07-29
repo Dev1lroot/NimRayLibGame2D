@@ -1,16 +1,17 @@
 import raylib, rlgl, raymath, rmem, reasings, rcamera, tables, os, random, sequtils, std/algorithm
-import player, ../libs/screen, ../libs/position2d, ../libs/textures, drawable, ../libs/collision, ../libs/rectangle2points
+import player, ../libs/screen, ../libs/position3d, ../libs/textures, drawable, ../libs/collision, ../libs/rectangle2points
 
 type
     Tile* = ref object of Drawable
-        name*: string
-        offsetX*: int32
-        offsetY*: int32 = 32
-        renderCollisionMask*:bool = false;
+        name*: string = "tile"
+        offsetX*: int32 = 0
+        offsetY*: int32 = 0
+        renderCollisionMask*:bool = false
+        hasCollision*:bool = false
 
-proc createTile*(x, y: int32): Tile =
+proc createTile*(name: string, x, y: int32): Tile =
     var tile = Tile()
-    tile.name = "tile"
+    tile.name = name
     tile.position.x = x
     tile.position.y = y
     return tile
